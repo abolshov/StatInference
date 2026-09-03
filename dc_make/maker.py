@@ -11,7 +11,7 @@ from .uncertainty import Uncertainty, UncertaintyType, UncertaintyScale, MultiVa
 from .model import Model
 from .binner import Binner
 ROOT = importROOT()
-
+from ..common.param_parse import applyParameters
 
 class DatacardMaker:
   customizeble_parameters = ["eras", "channels", "categories"]
@@ -34,10 +34,17 @@ class DatacardMaker:
       print(f"Overriding config parameter {param} to {value}")
       cfg[param] = value
 
+    self.model = Model.fromConfig(cfg["model"])
+
     self.analysis = cfg["analysis"]
     self.eras = cfg["eras"]
     self.channels = cfg["channels"]
-    self.categories = cfg["categories"]
+    if type(cfg["categories"]) is list:
+      self.categories = cfg["categories"]
+      self.category_to_shape_name = { c : c for c in self.categories }
+    else:
+      self.categories = list(cfg["categories"].keys())
+      self.category_to_shape_name = cfg["categories"]
     self.signalFractionForRelevantBins = cfg['signalFractionForRelevantBins']
 
 
@@ -46,7 +53,9 @@ class DatacardMaker:
       bin = self.getBin(era, channel, cat, return_index=False)
       self.bins.append(bin)
 
-    self.model = Model.fromConfig(cfg["model"])
+    print(f"bins={self.bins}")
+
+    
     self.keep_all_signal_hypothesis_into_single_datacard = cfg.get("keep_all_signal_hypothesis_into_single_datacard", False)
     self.param_bins = {}
     self.processes = {}
@@ -106,7 +115,6 @@ class DatacardMaker:
 
     hist_bins = hist_bins or cfg.get("hist_bins", None)
     self.hist_binner = Binner(hist_bins)
-    # print(f"Using hist_bins: {self.hist_binner.hist_bins}")
 
     self.input_files = {}
     self.shapes = {}
@@ -150,7 +158,9 @@ class DatacardMaker:
 
   def getMultiValueLnUnc(self,unc,unc_name, process, era, channel, category, model_params):#, unc_name=None, unc_scale=None)
     file_name, file = self.getInputFile(era, model_params)
-    hist_name = f"{channel}/{category}/{process.hist_name}"
+    shape_category_pattern = self.category_to_shape_name[category]
+    shape_category = applyParameters(shape_category_pattern, model_params)
+    hist_name = f"{channel}/{shape_category}/{process.hist_name}"
     if unc.getUncertaintyForProcess(process.name) != None:
       return unc.getUncertaintyForProcess(process.name)
     elif process.subprocesses:
@@ -158,7 +168,7 @@ class DatacardMaker:
       unc_value_tot_up = 0.
       yield_value_tot = 0.
       for subp in process.subprocesses:
-        hist_name = f"{channel}/{category}/{subp}"
+        hist_name = f"{channel}/{shape_category}/{subp}"
         subhist = file.Get(hist_name)
         #newhist = self.hist_binner.applyBinning(era, channel, category, model_params, subhist)
         if subhist == None:
@@ -202,11 +212,14 @@ class DatacardMaker:
         if hist is None:
           raise RuntimeError("Cannot create asimov data histogram")
       else:
-        hist_name = f"{channel}/{category}/{process.hist_name}"
+        shape_category_pattern = self.category_to_shape_name[category]
+        shape_category = applyParameters(shape_category_pattern, model_params)
+        hist_name = f"{channel}/{shape_category}/{process.hist_name}"
+        print(f"querying {hist_name}")
         hists = []
         if process.subprocesses:
           for subp in process.subprocesses:
-            hist_name = f"{channel}/{category}/{subp}"
+            hist_name = f"{channel}/{shape_category}/{subp}"
             if unc_name and unc_scale:
               hist_name += f"_{unc_name}_{unc_scale}"
             subhist = file.Get(hist_name)
@@ -300,10 +313,16 @@ class DatacardMaker:
 
 
     elif self.model.param_dependent_bkg:
+      seen = set()
       for signal_proc in self.processes.values():
-        if not signal_proc.is_signal: continue
+        if not signal_proc.is_signal:
+            continue
         model_params = signal_proc.params
-        param_str = self.model.paramStr(model_params) if not self.keep_all_signal_hypothesis_into_single_datacard else '*'
+        param_str = self.model.paramStr(model_params) \
+            if not self.keep_all_signal_hypothesis_into_single_datacard else '*'
+        if param_str in seen:
+            continue
+        seen.add(param_str)
         add(model_params, param_str, proc)
         self.param_of[(param_str, proc)] = model_params
         self.base_of[proc] = proc
