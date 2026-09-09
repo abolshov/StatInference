@@ -264,7 +264,7 @@ class DatacardMaker:
             print(f'bin_values: [ {", ".join(bin_values)} ]')
             print(f'bin_errors: [ {", ".join(bin_errors)} ]')
             raise RuntimeError(
-                f"Negative bins found in histogram for {channel}/{category}/{process.hist_name}"
+                f"Negative bins found in histogram for {era}/{channel}/{category}/{process.hist_name}"
                 + (f" (syst {unc_name}{unc_scale})" if unc_name and unc_scale else "")
             )
       self.shapes[key] = hist
