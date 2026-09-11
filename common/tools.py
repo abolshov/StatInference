@@ -142,18 +142,20 @@ def resolveNegativeBins(histogram, allow_zero_integral=False, allow_negative_int
     if solution.integral == 0:
         solution.has_zero_integral = True
         solution.accepted = allow_zero_integral
-        #print("integral = 0")
+        # print("integral = 0")
         return solution
     if solution.integral < 0:
         solution.has_negative_integral = True
         solution.accepted = allow_negative_integral
-        #print("integral < 0")
+        # print("integral < 0")
         return solution
 
     donor_integral = 0.
     negative_integral = 0.
 
     for bin_idx in range(n_bins):
+        # print(f"bin_idx={bin_idx}")
+        # print(f"bin_contents[{bin_idx}]={bin_contents[bin_idx]}")
         if bin_contents[bin_idx] >= 0:
             if bin_numbers[bin_idx] not in relevant_bins:
                 donor_integral += bin_contents[bin_idx]
@@ -165,16 +167,19 @@ def resolveNegativeBins(histogram, allow_zero_integral=False, allow_negative_int
         if zero_within_error:
             solution.negative_bins_within_error.add(bin_numbers[bin_idx])
         if not allow_negative_bins_within_error or not zero_within_error:
+            # print(f"\tnot allow_negative_bins_within_error={not allow_negative_bins_within_error}, not zero_within_error={not zero_within_error}")
             solution.accepted = False
         if bin_numbers[bin_idx] in relevant_bins:
+            # print(f"\tbin_numbers[{bin_idx}] in relevant_bins={bin_numbers[bin_idx] in relevant_bins}")
             solution.relevant_negative_bins.add(bin_numbers[bin_idx])
             solution.accepted = False
 
     if abs(negative_integral) > donor_integral:
+        # print(f"\tabs(negative_integral) > donor_integral={abs(negative_integral) > donor_integral}")
         solution.accepted = False
 
     if not solution.accepted or len(solution.negative_bins) == 0:
-        #print("solution not accepted or len solution(negative bins) = 0")
+        # print(f"not solution.accepted={not solution.accepted}, len(solution.negative_bins) == 0={len(solution.negative_bins) == 0}")
         return solution
 
     for bin_number in solution.negative_bins:
